@@ -8,14 +8,13 @@
 using namespace std;
 
 
-const int N = 5;
+const int N = 3;
 const int counterMax = 10;
 const float J = 1;
 const int dimension = 2;
 const int totalSpins = pow(N,dimension);
-const float temperatures[2] = {2,4};
 const double criticalTemperature = 2/(log(1+sqrt(2)));
-const int rows = sizeof(temperatures)/sizeof(temperatures[0]);
+const int rows = 1;
 
 #pragma pack(push, 1)
 struct BMPHeader {
@@ -37,7 +36,7 @@ struct BMPHeader {
     uint32_t importantColors = 0;
 };
 #pragma pack(pop)
-void createBMP(const std::vector<std::vector<int>>& image, const std::string& filename) {
+void createBMP(const vector<vector<int>>& image, const std::string& filename) {
     BMPHeader header;
     int width = image[0].size();
     int height = image.size();
@@ -69,31 +68,17 @@ void createBMP(const std::vector<std::vector<int>>& image, const std::string& fi
 
     bmpFile.close();
 }
-double* linspace(int arrayLength, bool printResult = false, double startValue = 0, double endValue = M_PI) {
+float* linspace(int arrayLength, float startValue, float endValue) {
     
-    if (printResult){
-        cout << "Array:     " << " ";    
-    }
-    
-    // Throw exception if m < 2
-    if (arrayLength < 2) {
-        throw invalid_argument("Array must have at least 2 elements");
-    }
-    
+     
     // Allocate memory for new array of length m
-    double* interpArray = new double[arrayLength];
+    float* interpArray = new float[arrayLength];
     
     // Iterate through the elements of new array giving equally m spaced values between start and end values, inclusive
     for (int n = 0; n < arrayLength; n++) {
         interpArray[n] = startValue + (endValue-startValue) * n / (arrayLength - 1);
-        // Print results if desired - default is no
-        if (printResult) {
-            cout << interpArray[n] << " ";    
-        }
     }
-    if (printResult) {
-        cout << endl;
-    }
+    
     return interpArray;
 }
 int getElement(vector<int> matrix, int address) {
@@ -102,15 +87,18 @@ int getElement(vector<int> matrix, int address) {
 void setElement(vector<int> &matrix, int address, int val) {
     matrix[address] = val;
 }
+
 void initializeLattice(vector<int> &lattice) {
     random_device rd;
-    mt19937 mt{};
-    uniform_int_distribution<int> coin( 0, 1 );
-    
+    mt19937 mt(rd());
+    uniform_int_distribution<int> coin(0, 1);
+
     for (int i = 0; i < totalSpins; i++) {
-        setElement(lattice,i,2*coin(mt)-1);
+        int spin = (coin(mt) == 0) ? -1 : 1;
+        setElement(lattice, i, spin);
     }
 }
+
 vector<int> getNeighbours(int site) {
     vector<int> neighbours ={};
 
@@ -238,13 +226,52 @@ vector<int> buildCluster(vector<int> &lattice, int startSite, float temperature 
         }
     return cluster;
 }
+vector<float> getTemperatures(float lowTempLowCutoff,float lowTempHighCutoff,float highTempLowCutoff,float highTempHighCutoff){
 
+    int halfRows;
+    if(rows % 2 == 0){
+        halfRows = rows/2;
+    } else{
+        halfRows = rows/2+1;
+    }
+
+    vector<float> temperatures(rows); 
+    float* lowTemps = new float[halfRows];
+    float* highTemps = new float[rows - halfRows];
+
+    lowTemps = linspace(halfRows, lowTempLowCutoff, lowTempHighCutoff);
+    highTemps = linspace(rows - halfRows, highTempLowCutoff, highTempHighCutoff);
+
+
+    for (int n = 0; n < halfRows; n++){
+        temperatures[n] = lowTemps[n];
+    }
+    for (int m = 0; m < rows-halfRows; m++){
+        temperatures[m+halfRows] = highTemps[m];
+    }
+
+    return temperatures;
+    delete lowTemps;
+    delete highTemps;
+
+}
 
 int main()
 {
+    float lowTempLowCutoff = 1;
+    float lowTempHighCutoff = 2;
+    float highTempLowCutoff = 3;
+    float highTempHighCutoff = 5;
+
+    //vector<float> temperatures = getTemperatures(lowTempLowCutoff, lowTempHighCutoff, highTempLowCutoff, highTempHighCutoff);
+    vector<float> temperatures = {2};
+
+
+
 
     vector<int> lattice(totalSpins,0);
-    int labels[2];
+    initializeLattice(lattice);
+    int labels[rows];
 
     // Set up output vector:
 
@@ -279,15 +306,19 @@ int main()
             flipSpins(lattice, cluster);
         }
 
+
+        
         for (int site = 0; site < totalSpins; site++){
             output[t][site] = int((lattice[site]+1)/2);
             cout << output[t][site] << ", ";
         }
         cout << endl;
+        
+
+       
+
     }
-
-
-
+    cout << "Done!";
 
     return 0;
 
