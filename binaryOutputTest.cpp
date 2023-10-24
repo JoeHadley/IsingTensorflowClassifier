@@ -5,7 +5,7 @@ using namespace std;
 
 int main() {
     // Open a binary file for writing
-    std::ofstream outFile("data.dat", std::ios::out | std::ios::binary);
+    std::ofstream outFile("lookForMe2.dat", std::ios::out | std::ios::binary);
 
     if (!outFile) {
         std::cerr << "Failed to open the file for writing." << std::endl;
