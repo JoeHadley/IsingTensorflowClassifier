@@ -3,19 +3,20 @@
 #include <random>
 #include <vector>
 #include <time.h>
-#include <cmath>
+
 #include <bits/stdc++.h>
 using namespace std;
 
 
-const int N = 3;
-const int counterMax = 10;
+const int N = 10;
+const int counterMax = 100;
 const float J = 1;
 const int dimension = 2;
 const int totalSpins = pow(N,dimension);
 const double criticalTemperature = 2/(log(1+sqrt(2)));
-const int rows = 1;
+const int rows = 10;
 
+/*
 #pragma pack(push, 1)
 struct BMPHeader {
     char signature[2] = {'B', 'M'};
@@ -68,6 +69,10 @@ void createBMP(const vector<vector<int>>& image, const std::string& filename) {
 
     bmpFile.close();
 }
+*/
+std::mt19937 initializeRandomGenerator() {
+    std::random_device rd;
+    return std::mt19937(rd());}
 float* linspace(int arrayLength, float startValue, float endValue) {
     
      
@@ -87,18 +92,14 @@ int getElement(vector<int> matrix, int address) {
 void setElement(vector<int> &matrix, int address, int val) {
     matrix[address] = val;
 }
+void initializeLattice(vector<int> &lattice, std::mt19937 &rng) {
+    std::uniform_int_distribution<int> coin(0, 1);
 
-void initializeLattice(vector<int> &lattice) {
-    random_device rd;
-    mt19937 mt(rd());
-    uniform_int_distribution<int> coin(0, 1);
-
-    for (int i = 0; i < totalSpins; i++) {
-        int spin = (coin(mt) == 0) ? -1 : 1;
-        setElement(lattice, i, spin);
+    for (int i = 0; i < lattice.size(); i++) {
+        int spin = (coin(rng) == 0) ? -1 : 1;
+        lattice[i] = spin;
     }
 }
-
 vector<int> getNeighbours(int site) {
     vector<int> neighbours ={};
 
@@ -185,7 +186,7 @@ void flipSpins(vector<int> &lattice, vector<int> sites) {
         lattice[sites[i]] = -1*lattice[sites[i]];  // flip the spin
     }
 }
-vector<int> buildCluster(vector<int> &lattice, int startSite, float temperature ) {
+vector<int> buildCluster(vector<int> &lattice, int startSite, float temperature, std::mt19937&rng ) {
 
     int startState = getElement(lattice,startSite);
 
@@ -212,8 +213,8 @@ vector<int> buildCluster(vector<int> &lattice, int startSite, float temperature 
                     else {
                         // If same state as start
                         if (getElement(lattice, neighbs[j]) == startState) {
-                            
-                            if  ((double) rand() / (RAND_MAX) <        (1-exp(-2*J/temperature))){
+                            uniform_real_distribution<double> distribution(0.0, 1.0);
+                            if  (distribution(rng) < (1 - exp(-2 * J / temperature))){
                                 stackNew.push_back(neighbs[j]);
                                 cluster.push_back(neighbs[j]);
                             }
@@ -255,37 +256,55 @@ vector<float> getTemperatures(float lowTempLowCutoff,float lowTempHighCutoff,flo
     delete highTemps;
 
 }
+void write_out(string fileName, vector<double>& vect) {
+    ofstream outFile(fileName, ios::out | ios::binary);
 
+    int size = sizeof(vect[0]);
+    std::cout << "size is " << size << endl;
+
+    for (int i = 0; i < vect.size(); i++) {
+        outFile.write(reinterpret_cast<char*>(&vect[i]), size);
+    }
+}
 int main()
 {
+    std::mt19937 rng = initializeRandomGenerator();
+
+
     float lowTempLowCutoff = 1;
-    float lowTempHighCutoff = 2;
-    float highTempLowCutoff = 3;
-    float highTempHighCutoff = 5;
+    float lowTempHighCutoff = 1;
+    float highTempLowCutoff = 1;
+    float highTempHighCutoff = 1;
 
     //vector<float> temperatures = getTemperatures(lowTempLowCutoff, lowTempHighCutoff, highTempLowCutoff, highTempHighCutoff);
-    vector<float> temperatures = {2};
+    vector<float> temperatures = {1};
 
 
 
 
     vector<int> lattice(totalSpins,0);
-    initializeLattice(lattice);
+    initializeLattice(lattice,rng);
+
+
+
+
     int labels[rows];
 
     // Set up output vector:
 
     vector<vector<int>> output(rows,vector<int>(totalSpins,0));
-
+    double overallSum = 0;
+    double count = 0;
+    int firstSite = 0;
+    int secondSite = 0;
 
     for (int t = 0; t < rows; t++){
 
-        random_device rd;
-        mt19937 gen(rd());
-        uniform_int_distribution<int> distrib(0, totalSpins-1);    
-        
 
-        float temperature = temperatures[t];
+        uniform_int_distribution<int> distrib(0, totalSpins-1);
+
+        //float temperature = temperatures[t];
+        float temperature = 1;
 
         if (temperature > criticalTemperature){
             labels[t] = 1;
@@ -293,16 +312,33 @@ int main()
             labels[t] = 0;
         }
 
-        initializeLattice(lattice);
+        initializeLattice(lattice,rng);
+        double initialSum = 0;
+        double finalSum = 0;
 
-        int startSite = distrib(gen);
+        for (int i=0;i<totalSpins;i++){
+            initialSum += lattice[i];
+        }
+
+        
+
+
+        int startSite = distrib(rng);
+        firstSite = startSite;
         int startState;
 
         
         for (int counter = 0; counter < counterMax; counter++) {
+            startSite = distrib(rng);
+            if (counter == 1){
+                secondSite = startSite;
+            }
+            vector<int> cluster = buildCluster(lattice, startSite, temperature, rng);
             
-            vector<int> cluster = buildCluster(lattice, startSite, temperature);
-            
+
+
+
+
             flipSpins(lattice, cluster);
         }
 
@@ -310,15 +346,24 @@ int main()
         
         for (int site = 0; site < totalSpins; site++){
             output[t][site] = int((lattice[site]+1)/2);
-            cout << output[t][site] << ", ";
-        }
-        cout << endl;
-        
+            finalSum += lattice[site];
+            overallSum += lattice[site];
+            count ++;
+            //cout << output[t][site] << ", ";
 
-       
+        }
+        //cout << sum/count  << endl;
+        
+        //write_out("input.dat", output);
+
+
+       double initialMean = initialSum/totalSpins;
+       double finalMean = finalSum/totalSpins; 
+       std::cout << "Test " << t+1 << std::setprecision(15)<< ", temperature: " << temperature << ", Inital mean is: " << std::setprecision(15)<< initialMean  << ", final mean: " << std::setprecision(15)<< finalMean<< ", first site: " << firstSite << ", second site: " << secondSite <<endl;
 
     }
-    cout << "Done!";
+    std::cout << overallSum/count  << endl;
+    std::cout << "Done!";
 
     return 0;
 
