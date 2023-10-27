@@ -268,8 +268,8 @@ void write_out(string fileName, vector<double>& vect) {
 }
 int main()
 {
+    
     std::mt19937 rng = initializeRandomGenerator();
-
 
     float lowTempLowCutoff = 1;
     float lowTempHighCutoff = 1;
@@ -283,7 +283,6 @@ int main()
 
 
     vector<int> lattice(totalSpins,0);
-    initializeLattice(lattice,rng);
 
 
 
@@ -299,7 +298,8 @@ int main()
     int secondSite = 0;
 
     for (int t = 0; t < rows; t++){
-
+        
+        //rng.seed(std::random_device()());
 
         uniform_int_distribution<int> distrib(0, totalSpins-1);
 
