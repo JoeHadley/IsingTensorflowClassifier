@@ -9,12 +9,12 @@ using namespace std;
 
 
 const int N = 10;
-const int counterMax = 100;
+const int counterMax = 1000;
 const float J = 1;
 const int dimension = 2;
 const int totalSpins = pow(N,dimension);
 const double criticalTemperature = 2/(log(1+sqrt(2)));
-const int rows = 10;
+const int rows = 300;
 
 /*
 #pragma pack(push, 1)
@@ -256,7 +256,7 @@ vector<float> getTemperatures(float lowTempLowCutoff,float lowTempHighCutoff,flo
     delete highTemps;
 
 }
-void write_out(string fileName, vector<double>& vect) {
+void write_out(string fileName, vector<int>& vect) {
     ofstream outFile(fileName, ios::out | ios::binary);
 
     int size = sizeof(vect[0]);
@@ -266,18 +266,30 @@ void write_out(string fileName, vector<double>& vect) {
         outFile.write(reinterpret_cast<char*>(&vect[i]), size);
     }
 }
+void write_out(string fileName, vector<vector<int>>& vect) {
+    ofstream outFile(fileName, ios::out | ios::binary);
+
+    int size = sizeof(vect[0][0]);
+    std::cout << "size is " << size << endl;
+
+    for (int i = 0; i < vect.size(); i++) {
+        for(int j = 0; j < vect[0].size(); j++){
+            outFile.write(reinterpret_cast<char*>(&vect[i]), size);
+        }
+    }
+}
 int main()
 {
     
     std::mt19937 rng = initializeRandomGenerator();
 
     float lowTempLowCutoff = 1;
-    float lowTempHighCutoff = 1;
-    float highTempLowCutoff = 1;
-    float highTempHighCutoff = 1;
+    float lowTempHighCutoff = 2;
+    float highTempLowCutoff = 3;
+    float highTempHighCutoff = 5;
 
-    //vector<float> temperatures = getTemperatures(lowTempLowCutoff, lowTempHighCutoff, highTempLowCutoff, highTempHighCutoff);
-    vector<float> temperatures = {1};
+    vector<float> temperatures = getTemperatures(lowTempLowCutoff, lowTempHighCutoff, highTempLowCutoff, highTempHighCutoff);
+    //vector<float> temperatures = {1};
 
 
 
@@ -287,7 +299,7 @@ int main()
 
 
 
-    int labels[rows];
+    vector<int> labels(rows);
 
     // Set up output vector:
 
@@ -303,8 +315,8 @@ int main()
 
         uniform_int_distribution<int> distrib(0, totalSpins-1);
 
-        //float temperature = temperatures[t];
-        float temperature = 1;
+        float temperature = temperatures[t];
+        //float temperature = 1;
 
         if (temperature > criticalTemperature){
             labels[t] = 1;
@@ -358,10 +370,21 @@ int main()
 
 
        double initialMean = initialSum/totalSpins;
-       double finalMean = finalSum/totalSpins; 
-       std::cout << "Test " << t+1 << std::setprecision(15)<< ", temperature: " << temperature << ", Inital mean is: " << std::setprecision(15)<< initialMean  << ", final mean: " << std::setprecision(15)<< finalMean<< ", first site: " << firstSite << ", second site: " << secondSite <<endl;
+       double finalMean = finalSum/totalSpins;
+
+       if (t%1 == 0) {
+            std::cout << "Test " << t+1 << std::setprecision(15)<< ", temperature: " << temperature << ", Inital mean is: " << std::setprecision(15)<< initialMean  << ", final mean: " << std::setprecision(15)<< finalMean<< ", first site: " << firstSite << ", second site: " << secondSite <<endl;
+       }
+       
 
     }
+
+    
+    write_out("C:\\Users\\jjhadley\\Documents\\Projects\\Ising\\Data\\testingData.dat",output);
+    //write_out("output76.dat",output);
+
+    write_out("C:\\Users\\jjhadley\\Documents\\Projects\\Ising\\Data\\testingLabels.dat",labels);
+
     std::cout << overallSum/count  << endl;
     std::cout << "Done!";
 
