@@ -3,6 +3,7 @@
 #include <random>
 #include <vector>
 #include <time.h>
+#include <ctime>
 
 #include <bits/stdc++.h>
 using namespace std;
@@ -14,77 +15,26 @@ const float J = 1;
 const int dimension = 2;
 const int totalSpins = pow(N,dimension);
 const double criticalTemperature = 2/(log(1+sqrt(2)));
-const int rows = 300;
+const int rows = 1;
+const bool print = false;
 
-/*
-#pragma pack(push, 1)
-struct BMPHeader {
-    char signature[2] = {'B', 'M'};
-    uint32_t fileSize;      // Size of the BMP file
-    uint16_t reserved1 = 0; // Reserved
-    uint16_t reserved2 = 0; // Reserved
-    uint32_t dataOffset;    // Offset to the start of image data
-    uint32_t headerSize = 40; // Size of the header
-    int32_t width;          // Width of the image
-    int32_t height;         // Height of the image
-    uint16_t planes = 1;
-    uint16_t bitsPerPixel = 1; // 1-bit BMP
-    uint32_t compression = 0;
-    uint32_t dataSize = 0;
-    int32_t horizontalResolution = 2835; // Pixels per meter (2835 ppm = 72 dpi)
-    int32_t verticalResolution = 2835;   // Pixels per meter (2835 ppm = 72 dpi)
-    uint32_t colors = 0;
-    uint32_t importantColors = 0;
-};
-#pragma pack(pop)
-void createBMP(const vector<vector<int>>& image, const std::string& filename) {
-    BMPHeader header;
-    int width = image[0].size();
-    int height = image.size();
+const double lowTempCutoff = criticalTemperature;
+const double highTempCutoff = criticalTemperature;
 
-    header.width = width;
-    header.height = height;
-    int rowWidth = (width + 31) / 32 * 4; // Each row should be a multiple of 4 bytes
 
-    header.fileSize = sizeof(BMPHeader) + rowWidth * height;
-
-    std::ofstream bmpFile(filename, std::ios::out | std::ios::binary);
-
-    // Write the BMP header
-    bmpFile.write(reinterpret_cast<char*>(&header), sizeof(header));
-
-    // Write the pixel data (bottom-up)
-    for (int y = height - 1; y >= 0; --y) {
-        for (int x = 0; x < width; ++x) {
-            uint8_t pixel = (image[y][x] == 1) ? 0xFF : 0x00; // White or Black
-            bmpFile.write(reinterpret_cast<char*>(&pixel), 1);
-        }
-
-        // Add padding to make the row width a multiple of 4 bytes
-        for (int padding = rowWidth - width; padding > 0; --padding) {
-            uint8_t paddingByte = 0x00;
-            bmpFile.write(reinterpret_cast<char*>(&paddingByte), 1);
-        }
-    }
-
-    bmpFile.close();
-}
-*/
 std::mt19937 initializeRandomGenerator() {
-    std::random_device rd;
-    return std::mt19937(rd());}
-float* linspace(int arrayLength, float startValue, float endValue) {
-    
-     
-    // Allocate memory for new array of length m
-    float* interpArray = new float[arrayLength];
-    
-    // Iterate through the elements of new array giving equally m spaced values between start and end values, inclusive
-    for (int n = 0; n < arrayLength; n++) {
-        interpArray[n] = startValue + (endValue-startValue) * n / (arrayLength - 1);
+    unsigned seed = static_cast<unsigned>(std::time(nullptr));
+    std::mt19937 rng(seed);
+    return rng;
+}
+void linspace(std::vector<double> &interpVector, float startValue, float endValue, int numPoints) {
+    interpVector.clear();
+    double step = (endValue - startValue) / (numPoints - 1);
+
+    // Populate the vector with equally spaced values
+    for (int n = 0; n < numPoints; n++) {
+        interpVector.push_back(startValue + step * n);
     }
-    
-    return interpArray;
 }
 int getElement(vector<int> matrix, int address) {
     return matrix[address];
@@ -227,34 +177,11 @@ vector<int> buildCluster(vector<int> &lattice, int startSite, float temperature,
         }
     return cluster;
 }
-vector<float> getTemperatures(float lowTempLowCutoff,float lowTempHighCutoff,float highTempLowCutoff,float highTempHighCutoff){
+vector<double> getTemperatures(double lowTempCutoff,double highTempCutoff){
 
-    int halfRows;
-    if(rows % 2 == 0){
-        halfRows = rows/2;
-    } else{
-        halfRows = rows/2+1;
-    }
-
-    vector<float> temperatures(rows); 
-    float* lowTemps = new float[halfRows];
-    float* highTemps = new float[rows - halfRows];
-
-    lowTemps = linspace(halfRows, lowTempLowCutoff, lowTempHighCutoff);
-    highTemps = linspace(rows - halfRows, highTempLowCutoff, highTempHighCutoff);
-
-
-    for (int n = 0; n < halfRows; n++){
-        temperatures[n] = lowTemps[n];
-    }
-    for (int m = 0; m < rows-halfRows; m++){
-        temperatures[m+halfRows] = highTemps[m];
-    }
-
+    vector<double> temperatures(rows);
+    linspace(temperatures, lowTempCutoff, highTempCutoff,rows);    
     return temperatures;
-    delete lowTemps;
-    delete highTemps;
-
 }
 void write_out(string fileName, vector<int>& vect) {
     ofstream outFile(fileName, ios::out | ios::binary);
@@ -266,43 +193,31 @@ void write_out(string fileName, vector<int>& vect) {
         outFile.write(reinterpret_cast<char*>(&vect[i]), size);
     }
 }
-void write_out(string fileName, vector<vector<int>>& vect) {
-    ofstream outFile(fileName, ios::out | ios::binary);
+void write_out(const std::string& fileName, const std::vector<std::vector<int>>& vect) {
+    std::ofstream outFile(fileName, std::ios::out | std::ios::binary);
 
-    int size = sizeof(vect[0][0]);
-    std::cout << "size is " << size << endl;
+    if (!outFile.is_open()) {
+        std::cerr << "Failed to open the file for writing." << std::endl;
+        return;
+    }
 
-    for (int i = 0; i < vect.size(); i++) {
-        for(int j = 0; j < vect[0].size(); j++){
-            outFile.write(reinterpret_cast<char*>(&vect[i]), size);
+    for (const auto& row : vect) {
+        for (const int element : row) {
+            outFile.write(reinterpret_cast<const char*>(&element), sizeof(element));
         }
     }
+
+    outFile.close();
 }
 int main()
 {
     
     std::mt19937 rng = initializeRandomGenerator();
-
-    float lowTempLowCutoff = 1;
-    float lowTempHighCutoff = 2;
-    float highTempLowCutoff = 3;
-    float highTempHighCutoff = 5;
-
-    vector<float> temperatures = getTemperatures(lowTempLowCutoff, lowTempHighCutoff, highTempLowCutoff, highTempHighCutoff);
-    //vector<float> temperatures = {1};
-
-
-
-
+    vector<double> temperatures = getTemperatures(lowTempCutoff, highTempCutoff);
     vector<int> lattice(totalSpins,0);
-
-
-
-
     vector<int> labels(rows);
 
     // Set up output vector:
-
     vector<vector<int>> output(rows,vector<int>(totalSpins,0));
     double overallSum = 0;
     double count = 0;
@@ -311,12 +226,8 @@ int main()
 
     for (int t = 0; t < rows; t++){
         
-        //rng.seed(std::random_device()());
-
         uniform_int_distribution<int> distrib(0, totalSpins-1);
-
         float temperature = temperatures[t];
-        //float temperature = 1;
 
         if (temperature > criticalTemperature){
             labels[t] = 1;
@@ -361,12 +272,15 @@ int main()
             finalSum += lattice[site];
             overallSum += lattice[site];
             count ++;
-            //cout << output[t][site] << ", ";
+            if (site%10 == 0 ){
+                cout << endl;
+            }
+            cout << output[t][site] << ", ";
 
         }
+        cout << endl;
         //cout << sum/count  << endl;
         
-        //write_out("input.dat", output);
 
 
        double initialMean = initialSum/totalSpins;
@@ -379,11 +293,12 @@ int main()
 
     }
 
+    if (print){
+        write_out("C:\\Users\\jjhadley\\Documents\\Projects\\Ising\\Data\\testingData.dat",output);
+        write_out("C:\\Users\\jjhadley\\Documents\\Projects\\Ising\\Data\\testingLabels.dat",labels);
+        cout << "Written" << endl;
+    }
     
-    write_out("C:\\Users\\jjhadley\\Documents\\Projects\\Ising\\Data\\testingData.dat",output);
-    //write_out("output76.dat",output);
-
-    write_out("C:\\Users\\jjhadley\\Documents\\Projects\\Ising\\Data\\testingLabels.dat",labels);
 
     std::cout << overallSum/count  << endl;
     std::cout << "Done!";
