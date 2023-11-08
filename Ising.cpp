@@ -15,26 +15,63 @@ const float J = 1;
 const int dimension = 2;
 const int totalSpins = pow(N,dimension);
 const double criticalTemperature = 2/(log(1+sqrt(2)));
-const int rows = 1;
-const bool print = false;
 
-const double lowTempCutoff = criticalTemperature;
-const double highTempCutoff = criticalTemperature;
+const int temps = 15;
+const int samplesPerTemp = 20;
+const int rows = temps*samplesPerTemp;
+
+const double lowTempCutoff = 1;
+const double highTempCutoff = 5;
+
+const bool writeOut= true;
+const bool printSites = false;
+const bool printMeans = true;
+
+const string mode = "Test";
 
 
-std::mt19937 initializeRandomGenerator() {
-    unsigned seed = static_cast<unsigned>(std::time(nullptr));
-    std::mt19937 rng(seed);
+
+mt19937 initializeRandomGenerator() {
+    unsigned seed = static_cast<unsigned>(time(nullptr));
+    mt19937 rng(seed);
     return rng;
 }
-void linspace(std::vector<double> &interpVector, float startValue, float endValue, int numPoints) {
-    interpVector.clear();
-    double step = (endValue - startValue) / (numPoints - 1);
-
-    // Populate the vector with equally spaced values
-    for (int n = 0; n < numPoints; n++) {
-        interpVector.push_back(startValue + step * n);
+template <typename T>
+void show(const vector<T>& vec, string string = "") {
+    
+    cout << string;
+    for (const T& element : vec) {
+        cout << element << ", ";
     }
+    cout << endl;
+}
+void linspace(vector<double> &interpVector, double startValue, double endValue, int numPoints) {
+    interpVector.clear();
+
+    if (numPoints == 1){
+        interpVector.push_back(startValue);
+    }
+    else {
+        double step = (endValue - startValue) / (numPoints - 1);
+        for (int n = 0; n < numPoints; n++) {
+            interpVector.push_back(startValue + step * n);
+        }
+    }
+}
+vector<double> getTemperatures(double lowTempCutoff,double highTempCutoff){
+
+    vector<double> temperatures(temps);
+    linspace(temperatures, lowTempCutoff, highTempCutoff,temps);
+    
+    vector<double> returnMatrix(rows);
+    
+    for (int t = 0; t < temps; t++){
+        
+        for (int s = 0; s < samplesPerTemp; s++){
+            returnMatrix[t*samplesPerTemp + s] = temperatures[t];
+        }
+    }
+    return returnMatrix;
 }
 int getElement(vector<int> matrix, int address) {
     return matrix[address];
@@ -42,8 +79,8 @@ int getElement(vector<int> matrix, int address) {
 void setElement(vector<int> &matrix, int address, int val) {
     matrix[address] = val;
 }
-void initializeLattice(vector<int> &lattice, std::mt19937 &rng) {
-    std::uniform_int_distribution<int> coin(0, 1);
+void initializeLattice(vector<int> &lattice, mt19937 &rng) {
+    uniform_int_distribution<int> coin(0, 1);
 
     for (int i = 0; i < lattice.size(); i++) {
         int spin = (coin(rng) == 0) ? -1 : 1;
@@ -121,11 +158,11 @@ void showLattice(vector<int> &lattice, bool showValues = false ) {
    
     
 
-    std::cout << endl;
+    cout << endl;
 
-    std::cout << "Plus count: " << plusCount << " " <<"Minus count: " << minusCount <<"\n";
-    std::cout << "Agrees: " << agrees << " " <<"Disagrees: " << disagrees <<"\n";
-    std::cout << "Magnetisation: " << magnetisation << " " <<"Mean Magnetisation: " << magnetisation / (totalSpins) <<"\n";
+    cout << "Plus count: " << plusCount << " " <<"Minus count: " << minusCount <<"\n";
+    cout << "Agrees: " << agrees << " " <<"Disagrees: " << disagrees <<"\n";
+    cout << "Magnetisation: " << magnetisation << " " <<"Mean Magnetisation: " << magnetisation / (totalSpins) <<"\n";
     
 }
 void flipSpins(vector<int> &lattice, int site) {
@@ -136,7 +173,7 @@ void flipSpins(vector<int> &lattice, vector<int> sites) {
         lattice[sites[i]] = -1*lattice[sites[i]];  // flip the spin
     }
 }
-vector<int> buildCluster(vector<int> &lattice, int startSite, float temperature, std::mt19937&rng ) {
+vector<int> buildCluster(vector<int> &lattice, int startSite, float temperature, mt19937&rng ) {
 
     int startState = getElement(lattice,startSite);
 
@@ -177,67 +214,83 @@ vector<int> buildCluster(vector<int> &lattice, int startSite, float temperature,
         }
     return cluster;
 }
-vector<double> getTemperatures(double lowTempCutoff,double highTempCutoff){
-
-    vector<double> temperatures(rows);
-    linspace(temperatures, lowTempCutoff, highTempCutoff,rows);    
-    return temperatures;
-}
-void write_out(string fileName, vector<int>& vect) {
+template <typename T>
+void write_out(const string& fileName, const vector<T>& vect) {
     ofstream outFile(fileName, ios::out | ios::binary);
 
-    int size = sizeof(vect[0]);
-    std::cout << "size is " << size << endl;
-
-    for (int i = 0; i < vect.size(); i++) {
-        outFile.write(reinterpret_cast<char*>(&vect[i]), size);
+    if (!outFile.is_open()) {
+        cerr << "Failed to open the file for writing." << endl;
+        return;
     }
+
+    for (const T& element : vect) {
+        outFile.write(reinterpret_cast<const char*>(&element), sizeof(vect[0]));
+    }
+
+    outFile.close();
 }
-void write_out(const std::string& fileName, const std::vector<std::vector<int>>& vect) {
-    std::ofstream outFile(fileName, std::ios::out | std::ios::binary);
+template <typename T>
+void write_out(const string& fileName, const vector<vector<T>>& vect) {
+    ofstream outFile(fileName, ios::out | ios::binary);
 
     if (!outFile.is_open()) {
-        std::cerr << "Failed to open the file for writing." << std::endl;
+        cerr << "Failed to open the file for writing." << endl;
         return;
     }
 
     for (const auto& row : vect) {
-        for (const int element : row) {
+        for (const T& element : row) {
             outFile.write(reinterpret_cast<const char*>(&element), sizeof(element));
         }
     }
 
     outFile.close();
 }
+
 int main()
 {
-    
-    std::mt19937 rng = initializeRandomGenerator();
+    mt19937 rng = initializeRandomGenerator();
     vector<double> temperatures = getTemperatures(lowTempCutoff, highTempCutoff);
     vector<int> lattice(totalSpins,0);
     vector<int> labels(rows);
 
     // Set up output vector:
     vector<vector<int>> output(rows,vector<int>(totalSpins,0));
+
+
     double overallSum = 0;
     double count = 0;
     int firstSite = 0;
     int secondSite = 0;
 
-    for (int t = 0; t < rows; t++){
+    float temperature;
+    double initialSum;
+    double finalSum;
+    double initialMean;
+    double finalMean;
+    int startSite;
+    int startState;
+
+
+    for (int r = 0; r < rows; r++){
         
         uniform_int_distribution<int> distrib(0, totalSpins-1);
-        float temperature = temperatures[t];
+        temperature = temperatures[r];
+
+        //for (int n = 0; n < rows; n++){
+        //    cout << temperatures[n] << ",";
+        //}
+
 
         if (temperature > criticalTemperature){
-            labels[t] = 1;
+            labels[r] = 1;
         } else{
-            labels[t] = 0;
+            labels[r] = 0;
         }
 
         initializeLattice(lattice,rng);
-        double initialSum = 0;
-        double finalSum = 0;
+        initialSum = 0;
+        finalSum = 0;
 
         for (int i=0;i<totalSpins;i++){
             initialSum += lattice[i];
@@ -246,9 +299,9 @@ int main()
         
 
 
-        int startSite = distrib(rng);
+        startSite = distrib(rng);
         firstSite = startSite;
-        int startState;
+        
 
         
         for (int counter = 0; counter < counterMax; counter++) {
@@ -268,40 +321,58 @@ int main()
 
         
         for (int site = 0; site < totalSpins; site++){
-            output[t][site] = int((lattice[site]+1)/2);
+            output[r][site] = int((lattice[site]+1)/2);
             finalSum += lattice[site];
             overallSum += lattice[site];
             count ++;
             if (site%10 == 0 ){
-                cout << endl;
+                //cout << endl;
             }
-            cout << output[t][site] << ", ";
+            //cout << output[t][site] << ", ";
 
         }
-        cout << endl;
+        //cout << endl;
         //cout << sum/count  << endl;
         
 
 
-       double initialMean = initialSum/totalSpins;
-       double finalMean = finalSum/totalSpins;
+       initialMean = initialSum/totalSpins;
+       finalMean = finalSum/totalSpins;
 
-       if (t%1 == 0) {
-            std::cout << "Test " << t+1 << std::setprecision(15)<< ", temperature: " << temperature << ", Inital mean is: " << std::setprecision(15)<< initialMean  << ", final mean: " << std::setprecision(15)<< finalMean<< ", first site: " << firstSite << ", second site: " << secondSite <<endl;
+       if (r%1 == 0) {
+
+            if (samplesPerTemp > 1) {
+                cout << "Trial " << r+1 << ", Temp " << floor(r/samplesPerTemp)+1<< "/" << temps << ", Sample " << (r)%(samplesPerTemp)+1 <<"/" << samplesPerTemp << ", temperature: " << temperature;
+            }
+            else {
+                cout << "Trial " << r+1 << "/" << rows << ", Temperature: " << temperature;
+            }
+
+            if (printMeans){
+                cout << ", Inital mean is: " << setprecision(15)<< initialMean  << ", final mean: " << setprecision(15)<< finalMean;
+            }
+
+             
+            if (printSites){
+                cout << ", first site: " << firstSite << ", second site: " << secondSite;
+            }
+            cout << endl;
        }
        
 
     }
 
-    if (print){
-        write_out("C:\\Users\\jjhadley\\Documents\\Projects\\Ising\\Data\\testingData.dat",output);
-        write_out("C:\\Users\\jjhadley\\Documents\\Projects\\Ising\\Data\\testingLabels.dat",labels);
+    if (writeOut){
+
+        
+        write_out("C:\\Users\\jjhadley\\Documents\\Projects\\Ising\\Data\\" + mode + "ingData.dat",output);
+        write_out("C:\\Users\\jjhadley\\Documents\\Projects\\Ising\\Data\\" + mode + "ingLabels.dat",labels);
+        write_out("C:\\Users\\jjhadley\\Documents\\Projects\\Ising\\Data\\" + mode + "ingTemps.dat",temperatures);
         cout << "Written" << endl;
     }
     
 
-    std::cout << overallSum/count  << endl;
-    std::cout << "Done!";
+    cout << "Done!";
 
     return 0;
 
