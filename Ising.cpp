@@ -16,8 +16,8 @@ const int dimension = 2;
 const int totalSpins = pow(N,dimension);
 const double criticalTemperature = 2/(log(1+sqrt(2)));
 
-const int temps = 15;
-const int samplesPerTemp = 20;
+const int temps = 10;
+const int samplesPerTemp = 10;
 const int rows = temps*samplesPerTemp;
 
 const double lowTempCutoff = 1;
@@ -27,15 +27,14 @@ const bool writeOut= true;
 const bool printSites = false;
 const bool printMeans = true;
 
-const string mode = "Test";
-
-
+const string mode = "Small_Validat";
 
 mt19937 initializeRandomGenerator() {
     unsigned seed = static_cast<unsigned>(time(nullptr));
     mt19937 rng(seed);
     return rng;
 }
+
 template <typename T>
 void show(const vector<T>& vec, string string = "") {
     
@@ -143,6 +142,15 @@ void showLattice(vector<int> &lattice, bool showValues = false ) {
         
         magnetisation = magnetisation + getElement(lattice,site);
         vector<int> siteNeighbours = getNeighbours(site);
+
+        if (lattice[site] == 1){
+            plusCount++;
+        }
+        else {
+            minusCount++;
+        }
+
+
 
         for (int dir = 0; dir < siteNeighbours.size(); dir++) {
             if (lattice[site]*lattice[siteNeighbours[dir]] ==1) {
@@ -371,6 +379,8 @@ int main()
         cout << "Written" << endl;
     }
     
+
+    showLattice(lattice);
 
     cout << "Done!";
 
