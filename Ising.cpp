@@ -5,19 +5,20 @@
 #include <time.h>
 #include <ctime>
 
+
 #include <bits/stdc++.h>
 using namespace std;
 
 
-const int N = 10;
+const int N = 5;
 const int counterMax = 1000;
 const float J = 1;
 const int dimension = 2;
 const int totalSpins = pow(N,dimension);
 const double criticalTemperature = 2/(log(1+sqrt(2)));
 
-const int temps = 10;
-const int samplesPerTemp = 10;
+const int temps = 50;
+const int samplesPerTemp = 50;
 const int rows = temps*samplesPerTemp;
 
 const double lowTempCutoff = 1;
@@ -27,7 +28,11 @@ const bool writeOut= true;
 const bool printSites = false;
 const bool printMeans = true;
 
-const string mode = "Small_Validat";
+
+
+const string path = "C:\\Users\\jjhadley\\Documents\\Projects\\Ising\\Data\\";
+const string folder = "L=5\\";
+const string mode = "Training";
 
 mt19937 initializeRandomGenerator() {
     unsigned seed = static_cast<unsigned>(time(nullptr));
@@ -222,6 +227,7 @@ vector<int> buildCluster(vector<int> &lattice, int startSite, float temperature,
         }
     return cluster;
 }
+
 template <typename T>
 void write_out(const string& fileName, const vector<T>& vect) {
     ofstream outFile(fileName, ios::out | ios::binary);
@@ -255,6 +261,7 @@ void write_out(const string& fileName, const vector<vector<T>>& vect) {
     outFile.close();
 }
 
+
 int main()
 {
     mt19937 rng = initializeRandomGenerator();
@@ -284,11 +291,6 @@ int main()
         
         uniform_int_distribution<int> distrib(0, totalSpins-1);
         temperature = temperatures[r];
-
-        //for (int n = 0; n < rows; n++){
-        //    cout << temperatures[n] << ",";
-        //}
-
 
         if (temperature > criticalTemperature){
             labels[r] = 1;
@@ -373,10 +375,10 @@ int main()
     if (writeOut){
 
         
-        write_out("C:\\Users\\jjhadley\\Documents\\Projects\\Ising\\Data\\" + mode + "ingData.dat",output);
-        write_out("C:\\Users\\jjhadley\\Documents\\Projects\\Ising\\Data\\" + mode + "ingLabels.dat",labels);
-        write_out("C:\\Users\\jjhadley\\Documents\\Projects\\Ising\\Data\\" + mode + "ingTemps.dat",temperatures);
-        cout << "Written" << endl;
+        write_out(path + folder + mode + "Data.dat",output);
+        write_out(path + folder + mode + "Labels.dat",labels);
+        write_out(path + folder + mode + "Temps.dat",temperatures);
+        cout << "Written to "<< path+folder+mode << endl;
     }
     
 
