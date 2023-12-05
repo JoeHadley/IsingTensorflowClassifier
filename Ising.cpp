@@ -10,7 +10,7 @@
 using namespace std;
 
 
-const int N = 5;
+const int N = 10;
 const int counterMax = 1000;
 const float J = 1;
 const int dimension = 2;
@@ -31,9 +31,9 @@ const bool printMeans = true;
 
 
 const string path = "C:\\Users\\jjhadley\\Documents\\Projects\\Ising\\Data\\";
-const string folder = "L=5\\";
+const string folder = "L=10\\";
+//const string T_Equals = "T=";
 const string mode = "Training";
-
 mt19937 initializeRandomGenerator() {
     unsigned seed = static_cast<unsigned>(time(nullptr));
     mt19937 rng(seed);
@@ -62,6 +62,8 @@ void linspace(vector<double> &interpVector, double startValue, double endValue, 
         }
     }
 }
+
+/*
 vector<double> getTemperatures(double lowTempCutoff,double highTempCutoff){
 
     vector<double> temperatures(temps);
@@ -77,6 +79,11 @@ vector<double> getTemperatures(double lowTempCutoff,double highTempCutoff){
     }
     return returnMatrix;
 }
+*/
+
+
+
+
 int getElement(vector<int> matrix, int address) {
     return matrix[address];
 }
@@ -265,9 +272,13 @@ void write_out(const string& fileName, const vector<vector<T>>& vect) {
 int main()
 {
     mt19937 rng = initializeRandomGenerator();
-    vector<double> temperatures = getTemperatures(lowTempCutoff, highTempCutoff);
+    //vector<double> temperatures = getTemperatures(lowTempCutoff, highTempCutoff);
+    vector<double> temperatures(temps);
+    linspace(temperatures,lowTempCutoff,highTempCutoff,temps);
+    
     vector<int> lattice(totalSpins,0);
-    vector<int> labels(rows);
+    vector<int> Blabels(rows);
+    vector<int> Tlabels(rows);
 
     // Set up output vector:
     vector<vector<int>> output(rows,vector<int>(totalSpins,0));
@@ -285,101 +296,111 @@ int main()
     double finalMean;
     int startSite;
     int startState;
+    int row = 0;
 
 
-    for (int r = 0; r < rows; r++){
-        
-        uniform_int_distribution<int> distrib(0, totalSpins-1);
-        temperature = temperatures[r];
+    for (int t = 0; t < temps; t++){
 
-        if (temperature > criticalTemperature){
-            labels[r] = 1;
-        } else{
-            labels[r] = 0;
-        }
+        for (int s = 0; s < samplesPerTemp; s++){
+            
+            row = t*samplesPerTemp + s;
 
-        initializeLattice(lattice,rng);
-        initialSum = 0;
-        finalSum = 0;
+            uniform_int_distribution<int> distrib(0, totalSpins-1);
+            temperature = temperatures[t];
 
-        for (int i=0;i<totalSpins;i++){
-            initialSum += lattice[i];
-        }
-
-        
-
-
-        startSite = distrib(rng);
-        firstSite = startSite;
-        
-
-        
-        for (int counter = 0; counter < counterMax; counter++) {
-            startSite = distrib(rng);
-            if (counter == 1){
-                secondSite = startSite;
+            if (temperature > criticalTemperature){
+                Blabels[row] = 1;
+            } else{
+                Blabels[row] = 0;
             }
-            vector<int> cluster = buildCluster(lattice, startSite, temperature, rng);
+            Tlabels[row] = t;
+
+            initializeLattice(lattice,rng);
+            initialSum = 0;
+            finalSum = 0;
+
+            for (int i=0;i<totalSpins;i++){
+                initialSum += lattice[i];
+            }
+
             
 
 
+            startSite = distrib(rng);
+            firstSite = startSite;
+            
+
+            
+            for (int counter = 0; counter < counterMax; counter++) {
+                startSite = distrib(rng);
+                if (counter == 1){
+                    secondSite = startSite;
+                }
+                vector<int> cluster = buildCluster(lattice, startSite, temperature, rng);
+                
 
 
-            flipSpins(lattice, cluster);
-        }
 
 
+                flipSpins(lattice, cluster);
+            }
+
+
+            
+            for (int site = 0; site < totalSpins; site++){
+                output[row][site] = int((lattice[site]+1)/2);
+                finalSum += lattice[site];
+                overallSum += lattice[site];
+                count ++;
+                if (site%10 == 0 ){
+                    //cout << endl;
+                }
+                //cout << output[t][site] << ", ";
+
+            }
+
+            
+
+
+            initialMean = initialSum/totalSpins;
+            finalMean = finalSum/totalSpins;
+
+            if (s%1 == 0) {
+
+                    if (samplesPerTemp > 1) {
+                        cout << "Trial " << row+1 << ", Temp " << t+1<< "/" << temps << ", Sample " << (s)%(samplesPerTemp)+1 <<"/" << samplesPerTemp << ", temperature: " << temperature;
+                    }
+                    else {
+                        cout << "Trial " << row+1 << "/" << rows << ", Temperature: " << temperature;
+                    }
+
+                    if (printMeans){
+                        cout << ", Inital mean is: " << setprecision(15)<< initialMean  << ", final mean: " << setprecision(15)<< finalMean;
+                    }
+
+                    
+                    if (printSites){
+                        cout << ", first site: " << firstSite << ", second site: " << secondSite;
+                    }
+                    cout << endl;
+            }
         
-        for (int site = 0; site < totalSpins; site++){
-            output[r][site] = int((lattice[site]+1)/2);
-            finalSum += lattice[site];
-            overallSum += lattice[site];
-            count ++;
-            if (site%10 == 0 ){
-                //cout << endl;
-            }
-            //cout << output[t][site] << ", ";
 
         }
-        //cout << endl;
-        //cout << sum/count  << endl;
-        
-
-
-       initialMean = initialSum/totalSpins;
-       finalMean = finalSum/totalSpins;
-
-       if (r%1 == 0) {
-
-            if (samplesPerTemp > 1) {
-                cout << "Trial " << r+1 << ", Temp " << floor(r/samplesPerTemp)+1<< "/" << temps << ", Sample " << (r)%(samplesPerTemp)+1 <<"/" << samplesPerTemp << ", temperature: " << temperature;
-            }
-            else {
-                cout << "Trial " << r+1 << "/" << rows << ", Temperature: " << temperature;
-            }
-
-            if (printMeans){
-                cout << ", Inital mean is: " << setprecision(15)<< initialMean  << ", final mean: " << setprecision(15)<< finalMean;
-            }
-
-             
-            if (printSites){
-                cout << ", first site: " << firstSite << ", second site: " << secondSite;
-            }
-            cout << endl;
-       }
-       
 
     }
 
-    if (writeOut){
-
+        if (writeOut){
+            //string tempString = to_string(t) + "of" + to_string(temps);
         
-        write_out(path + folder + mode + "Data.dat",output);
-        write_out(path + folder + mode + "Labels.dat",labels);
-        write_out(path + folder + mode + "Temps.dat",temperatures);
-        cout << "Written to "<< path+folder+mode << endl;
-    }
+
+            write_out(path + folder  + mode +  "Data.dat",output);
+            write_out(path + folder  + mode +  "BLabels.dat",Blabels);
+            write_out(path + folder  + mode +  "TLabels.dat",Tlabels);
+            //write_out(path + folder  + mode +  "Temps.dat",temperatures);
+            //cout << "Written to "<< path + folder + tempString + mode +  "Data.dat" << endl;
+            //cout << "Written to "<< path+folder+mode << endl;
+        }
     
 
     showLattice(lattice);
