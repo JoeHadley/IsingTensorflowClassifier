@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+import matplotlib.pyplot as plt
 from tensorflow.keras.layers import Flatten, Dense, Dropout
 from tensorflow.keras.callbacks import EarlyStopping
 
@@ -20,9 +21,15 @@ def load_and_preprocess_data(data_path, labels_path, num_rows, side_length):
     labels = np.fromfile(labels_path, dtype=np.int32).reshape(num_rows, 1)
     return data, labels
 
-def shuffle_data(data, labels):
-    indices = np.random.permutation(len(labels))
-    return data[indices], labels[indices]
+
+def shuffle_data(*arrays):
+    # Check if all arrays have the same length
+    length = len(arrays[0])
+    if not all(len(arr) == length for arr in arrays):
+        raise ValueError("All arrays must have the same length")
+
+    indices = np.random.permutation(length)
+    return tuple(arr[indices] for arr in arrays)
 
 
 def getModelData(model):
@@ -31,6 +38,8 @@ def getModelData(model):
 
     model_training_labels = np.concatenate((training_labels[:model*size], training_labels[(model+1)*size:]), axis=0)
     model_testing_labels = training_labels[model*size:(model+1)*size]
+
+    #model_testing_temps = np.concatenate((training_labels[:model*size], training_labels[(model+1)*size:]), axis=0)
 
     model_training_data = np.concatenate((training_data[:model*size, :, :], training_data[(model+1)*size:, :, :]), axis=0)
     model_testing_data = training_data[model*size:(model+1)*size, :, :]
@@ -52,39 +61,39 @@ def create_model():
     model.compile(optimizer='adam', loss=loss_fn, metrics=['accuracy'])
     return model
 
+
+# Get params
+
+params = np.fromfile('data\\params.dat', dtype=np.float64)
+print(params)
+
+dimension = int(params[0])
+side_length = int(params[1])
+temperature_number = int(params[2])
+sample_number = int(params[3])
+min_temp = params[4]
+max_temp = params[5]
+
+num_rows = temperature_number * sample_number
+
 # Load and preprocess training and validating data
-temperature_number = 50
-sample_number = 50
-side_length = 10
-training_data_number = temperature_number * sample_number
-min_temp = 1
-max_temp = 5
-mode = 1 # Mode 1 - binary labels, Mode 2 - temperature labels
 
 
 print('Got here!')
 
 
-training_data_string = 'Training'
-validating_data_string = 'Validating'
+folder_string = 'data\\L=' + str(side_length) + '\\'
 
-if mode == 1: # Use binary labels 
-    training_data, training_labels = load_and_preprocess_data(training_data_string+'Data.dat', training_data_string+'Blabels.dat', training_data_number, side_length)
-    training_data, training_labels = shuffle_data(training_data, training_labels)
-    validation_data, validation_labels = load_and_preprocess_data(validating_data_string+'Data.dat', validating_data_string+'Blabels.dat', training_data_number, side_length)
-    output_node_number = 2
+training_data = np.fromfile(folder_string+'trainingData.dat', dtype=np.int32).reshape(num_rows, side_length, side_length)
+training_labels = np.fromfile(folder_string+'trainingLabels.dat', dtype=np.int32).reshape(num_rows, 1)
+training_temps = np.fromfile(folder_string+'trainingTemps.dat', dtype=np.float64).reshape(num_rows, 1)
 
-else: # Use temperature labels
-    training_data, training_labels = load_and_preprocess_data(training_data_string+'Data.dat', training_data_string+'Tlabels.dat', training_data_number, side_length)
-    training_data, training_labels = shuffle_data(training_data, training_labels)
-    validation_data, validation_labels = load_and_preprocess_data(validating_data_string+'Data.dat', validating_data_string+'Tlabels.dat', training_data_number, side_length)
-    # Recover temperatures from temperature labels
-    training_temps = min_temp + training_labels*(max_temp-min_temp)/(temperature_number-1)
-    validation_temps = min_temp + validation_labels*(max_temp-min_temp)/(temperature_number-1)
-    output_node_number = temperature_number
+training_data,training_labels, training_temps = shuffle_data(training_data,training_labels, training_temps)
 
-
-
+validating_data = np.fromfile(folder_string+'validatingData.dat', dtype=np.int32).reshape(num_rows, side_length, side_length)
+validating_labels = np.fromfile(folder_string+'validatingLabels.dat', dtype=np.int32).reshape(num_rows, 1)
+validating_temps = np.fromfile(folder_string+'validatingTemps.dat', dtype=np.float64).reshape(num_rows, 1)
+validating_tnumbers = np.fromfile(folder_string+'validatingTNumbers.dat', dtype=np.int32).reshape(num_rows, 1)
 
 
 
@@ -102,7 +111,7 @@ early_stopping = EarlyStopping(
 
 # We will train 5 models on different parts of the data.
 modelNumber = 5
-size = training_data_number // modelNumber  # Use integer division to ensure an integer size
+size = num_rows // modelNumber  # Use integer division to ensure an integer size
 
 training_labels = training_labels.flatten()
 
@@ -111,185 +120,47 @@ training_labels = training_labels.flatten()
 # Train the model
 loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
+output_node_number = 2
 
-
-#models = [create_model() for _ in range(modelNumber)]
-
-#for i, model in enumerate(models):
-#    model_training_labels, model_testing_labels, model_training_data, model_testing_data = getModelData(i)
-#    model.compile(optimizer='adam', loss=loss_fn, metrics=['accuracy'])
-
-
-
-
-
-neuralNet = tf.keras.models.Sequential([
-    Flatten(input_shape=(side_length, side_length)),
-    Dense(128, activation='relu'),
-    Dropout(0.2),
-    Dense(output_node_number)
-])
 
 loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-neuralNet.compile(optimizer='adam', loss=loss_fn, metrics=['accuracy'])
+models = [create_model() for _ in range(modelNumber)]
+validating_labels = validating_labels.flatten()
+
+# Start with an empty array with the right shape
+temperature_total_guesses = np.zeros((modelNumber,temperature_number))
+temperature_right_guesses = np.zeros((modelNumber,temperature_number))
 
 
-model = 0
+for i, model in enumerate(models):
+    model_training_labels, model_testing_labels, model_training_data, model_testing_data = getModelData(i)
+    model.compile(optimizer='adam', loss=loss_fn, metrics=['accuracy'])
+    model.fit(model_training_data, model_training_labels, epochs=50, validation_data=(model_testing_data, model_testing_labels), callbacks=[early_stopping])
+    
 
-model_training_labels = np.concatenate((training_labels[:model*size], training_labels[(model+1)*size:]), axis=0)
-model_testing_labels = training_labels[model*size:(model+1)*size]
+    for t in range(temperature_number):
+        for sample in range(sample_number):
+            index = t * sample_number + sample
 
-model_training_data = np.concatenate((training_data[:model*size, :, :], training_data[(model+1)*size:, :, :]), axis=0)
-model_testing_data = training_data[model*size:(model+1)*size, :, :]
+            tNumber = validating_tnumbers[index]
 
-print(model_testing_data)
+            correct_label = validating_labels[index]
 
-
-'''
-neuralNet.fit(model_training_data, model_training_labels, epochs=50, validation_data=(model_testing_data, model_testing_labels), callbacks=[early_stopping])
-'''
-
-
-
-
+            print('Correct label is ',correct_label)
+            temperature_total_guesses[i,tNumber] = temperature_total_guesses[i,tNumber] + 1
 
 
-validation_labels = validation_labels.flatten()
+            
+            model_prediction = model.predict(validating_data[index:index+1],verbose=0)
+            guessed_label = np.argmax(model_prediction, axis=1)
+            print('Model ' + str(i) + ', Temperature ' + str(t) + ', sample ' + str(sample) + ' guessed ' + str(guessed_label))
 
-#showMe(validation_data[600])
-'''
-print(validation_data[600])
-print(validation_labels[600])
-
-
-print(sum(sum(validation_data[1000]))/100)
-'''
-
-
-'''
-critTemp = 2.269185
-badRowArray = np.array([])
-badLabelArray = np.array([])
-badTempArray = np.array([])
-threshold = 0.5
-
-dataArray = 2*validation_data - 1
-labelArray = validation_labels
-
-if mode == 2:
-
-    tempArray = training_temps
-
-
-
-for i in range(training_data_number):
-    badness = 0
-    badnessString = 'fine'
-    magnetization = np.mean(dataArray[i])
+            if guessed_label == correct_label:
+                temperature_right_guesses[i,tNumber] = temperature_right_guesses[i,tNumber] + 1
+    
 
     
-    if mode == 2:
-
-        if tempArray < critTemp:
-
-            tempString = 'cold'
-            
-            if abs(magnetization) < threshold:
-
-                badness = 1
-                badnessString = 'bad'
-                badRowArray = np.append(badRowArray,i)
-                badLabelArray = np.append(badLabelArray,labelArray[i])
-
-
-        elif  tempArray > critTemp:
-
-            tempString = 'hot'
-
-            if abs(magnetization) > threshold:
-
-                badness = 1
-                badnessString = 'bad'
-                badRowArray = np.append(badRowArray,i)
-                badLabelArray = np.append(badLabelArray,labelArray[i])
-
-    else:
-
-        if labelArray[i] == 0:
-
-            tempString = 'cold'
-            
-            if abs(magnetization) < threshold:
-
-                badness = 1
-                badnessString = 'bad'
-                badRowArray = np.append(badRowArray,i)
-                badLabelArray = np.append(badLabelArray,labelArray[i])
-
-
-        else:
-
-            tempString = 'hot'
-
-            if abs(magnetization) > threshold:
-
-                badness = 1
-                badnessString = 'bad'
-                badRowArray = np.append(badRowArray,i)
-                badLabelArray = np.append(badLabelArray,labelArray[i])
-
-
-
-    showString = 'Row ' + str(i) + ', label ' +  str(labelArray[i]) + ', lattice is '  + tempString + ', mean is ' + str(magnetization) + ', this is ' + badnessString
-    print(showString)
-
-
-#showMe(badLabelArray)
-#showMe(badTempArray)
-
-
-showMe(badRowArray,'badRowArray',True)
-print('uniques: ', np.unique(badRowArray))
-
-showMe(dataArray[860],'Validation 860')
-print(validation_labels[860])
-
-
-'''
-
-
-big_accuracies = np.array([]).reshape(0, temperature_number)  # Start with an empty array with the right shape
-temperatures = np.unique(validation_temps)
-
-
-
-temperature_total_guesses = np.zeros(temperature_number)
-temperature_right_guesses = np.zeros(temperature_number)
-temperature_nearly_right_guesses = np.zeros(temperature_number)
-
-
-
-#for i, model in enumerate(models):
-model_guesses = []
-model_accuracies = []
-
-for t in range(temperature_number):
-    for sample in range(sample_number):
-        index = t * sample_number + sample
-        
-        correct_label = validation_labels[index]
-
-        print('Correct label is ',correct_label)
-        temperature_total_guesses[correct_label] = temperature_total_guesses[correct_label] + 1
-
-
-        
-        model_prediction = model0.predict(validation_data[index:index+1],verbose=0) # sus
-        guessed_label = np.argmax(model_prediction, axis=1)
-        print('Model ' + str(model) + ', Temperature ' + str(t) + ', sample ' + str(sample) + ' guessed ' + str(guessed_label))
-
-        if guessed_label == correct_label:
-            temperature_right_guesses[correct_label] = temperature_right_guesses[correct_label] + 1
+accuracy = temperature_right_guesses/temperature_total_guesses
 
 print(temperature_right_guesses/temperature_total_guesses)
     
@@ -301,12 +172,27 @@ print(temperature_right_guesses/temperature_total_guesses)
 
 
 
-means = []
-errors = []
+means = np.zeros(temperature_number)
+errors = np.zeros(temperature_number)
+accuracy = temperature_right_guesses/temperature_total_guesses
+
 
 for t in range(temperature_number):
-    mean = np.mean(big_accuracies[:,t])
-    error = np.std(big_accuracies[:,t])/np.sqrt(modelNumber)
+    mean = np.mean(accuracy[:,t])
+    error = np.std(accuracy[:,t])/np.sqrt(modelNumber)
 
-    means.append(mean)
-    errors.append(error)
+    means[t] = mean
+    errors[t] = error
+
+
+temperatures = np.linspace(min_temp,max_temp,temperature_number)
+plt.errorbar(temperatures,means,errors)
+
+plt.axhline(y=1, color='black')
+plt.axvline(x=2/(np.log(1+np.sqrt(2))), color='black', linestyle='dotted')
+
+plt.title("Accuracy of an Ensemble of 5 Neural Networks \n Classifying Configurations of a 10^2 Ising Lattice")
+plt.xlabel("Temperature")
+#plt.ylim(0, 1.2)  # Set y-axis limits from 0 to 12
+plt.ylabel("Mean Accuracy of Neural Networks")
+plt.show()
