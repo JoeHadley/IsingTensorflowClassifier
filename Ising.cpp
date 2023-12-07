@@ -21,8 +21,8 @@ const int temps = 50;
 const int samplesPerTemp = 50;
 const int rows = temps*samplesPerTemp;
 
-const double lowTempCutoff = 1;
-const double highTempCutoff = 5;
+const double lowTempCutoff = 1.5;
+const double highTempCutoff = 3;
 
 const bool writeOut= true;
 const bool printSites = false;
@@ -31,9 +31,9 @@ const bool printMeans = true;
 
 
 const string path = "C:\\Users\\jjhadley\\Documents\\Projects\\Ising\\Data\\";
-const string folder = "L=10\\";
+const string folder = "L=" + to_string(N) + "\\";
 //const string T_Equals = "T=";
-const string mode = "Training";
+const string mode = "training";
 mt19937 initializeRandomGenerator() {
     unsigned seed = static_cast<unsigned>(time(nullptr));
     mt19937 rng(seed);
@@ -43,11 +43,11 @@ mt19937 initializeRandomGenerator() {
 template <typename T>
 void show(const vector<T>& vec, string string = "") {
     
-    cout << string;
+    std::cout << string;
     for (const T& element : vec) {
-        cout << element << ", ";
+        std::cout << element << ", ";
     }
-    cout << endl;
+    std::cout << endl;
 }
 void linspace(vector<double> &interpVector, double startValue, double endValue, int numPoints) {
     interpVector.clear();
@@ -120,25 +120,25 @@ void showLattice(vector<int> &lattice, bool showValues = false ) {
         
         for (int dim = dimension; dim > 0; dim--){
             if (site %(int(pow(N,dim))) == 0) {
-                cout << "\n";
+                std::cout << "\n";
             }            
         } 
 
         if (showValues){
             
             if (lattice[site] < 0){
-                cout << lattice[site] << ",";
+                std::cout << lattice[site] << ",";
             }
             else{
-                cout << " " << lattice[site] << ",";
+                std::cout << " " << lattice[site] << ",";
             }
         }
         else{
             if (lattice[site] == 1) {
-                cout << "+ ";
+                std::cout << "+ ";
             } 
             else {
-                cout << "- ";
+                std::cout << "- ";
             }
         }
     }
@@ -178,11 +178,11 @@ void showLattice(vector<int> &lattice, bool showValues = false ) {
    
     
 
-    cout << endl;
+    std::cout << endl;
 
-    cout << "Plus count: " << plusCount << " " <<"Minus count: " << minusCount <<"\n";
-    cout << "Agrees: " << agrees << " " <<"Disagrees: " << disagrees <<"\n";
-    cout << "Magnetisation: " << magnetisation << " " <<"Mean Magnetisation: " << magnetisation / (totalSpins) <<"\n";
+    std::cout << "Plus count: " << plusCount << " " <<"Minus count: " << minusCount <<"\n";
+    std::cout << "Agrees: " << agrees << " " <<"Disagrees: " << disagrees <<"\n";
+    std::cout << "Magnetisation: " << magnetisation << " " <<"Mean Magnetisation: " << magnetisation / (totalSpins) <<"\n";
     
 }
 void flipSpins(vector<int> &lattice, int site) {
@@ -277,11 +277,17 @@ int main()
     linspace(temperatures,lowTempCutoff,highTempCutoff,temps);
     
     vector<int> lattice(totalSpins,0);
-    vector<int> Blabels(rows);
-    vector<int> Tlabels(rows);
 
     // Set up output vector:
-    vector<vector<int>> output(rows,vector<int>(totalSpins,0));
+    vector<double> outputParams = {dimension,N,temps,samplesPerTemp,lowTempCutoff,highTempCutoff};
+    vector<string> outputParamDescription = {"dimension","sidelength","temperatureNumber","sampleNumber","lowTempCutoff","highTempCutoff"};
+
+
+
+    vector<vector<int>> outputLattices(rows,vector<int>(totalSpins,0));
+    vector<int> outputLabels(rows);
+    vector<double> outputTemperatures(rows);
+    vector<int> outputTNumbers(rows);
 
 
     double overallSum = 0;
@@ -308,12 +314,11 @@ int main()
             uniform_int_distribution<int> distrib(0, totalSpins-1);
             temperature = temperatures[t];
 
-            if (temperature > criticalTemperature){
-                Blabels[row] = 1;
-            } else{
-                Blabels[row] = 0;
-            }
-            Tlabels[row] = t;
+
+
+
+
+
 
             initializeLattice(lattice,rng);
             initialSum = 0;
@@ -347,17 +352,28 @@ int main()
 
 
             
+
+
+            // Populate output data
             for (int site = 0; site < totalSpins; site++){
-                output[row][site] = int((lattice[site]+1)/2);
+                outputLattices[row][site] = int((lattice[site]+1)/2);
                 finalSum += lattice[site];
                 overallSum += lattice[site];
                 count ++;
                 if (site%10 == 0 ){
-                    //cout << endl;
+                    //std::cout << endl;
                 }
-                //cout << output[t][site] << ", ";
-
+                //std::cout << output[t][site] << ", ";
             }
+
+            
+            if (temperature > criticalTemperature){
+                outputLabels[row] = 1;
+            } else{
+                outputLabels[row] = 0;
+            }
+            outputTNumbers[row] = t;
+            outputTemperatures[row] = temperature;
 
             
 
@@ -368,21 +384,21 @@ int main()
             if (s%1 == 0) {
 
                     if (samplesPerTemp > 1) {
-                        cout << "Trial " << row+1 << ", Temp " << t+1<< "/" << temps << ", Sample " << (s)%(samplesPerTemp)+1 <<"/" << samplesPerTemp << ", temperature: " << temperature;
+                        std::cout << "Trial " << row+1 << ", Temp " << t+1<< "/" << temps << ", Sample " << (s)%(samplesPerTemp)+1 <<"/" << samplesPerTemp << ", temperature: " << temperature;
                     }
                     else {
-                        cout << "Trial " << row+1 << "/" << rows << ", Temperature: " << temperature;
+                        std::cout << "Trial " << row+1 << "/" << rows << ", Temperature: " << temperature;
                     }
 
                     if (printMeans){
-                        cout << ", Inital mean is: " << setprecision(15)<< initialMean  << ", final mean: " << setprecision(15)<< finalMean;
+                        std::cout << ", Inital mean is: " << setprecision(15)<< initialMean  << ", final mean: " << setprecision(15)<< finalMean;
                     }
 
                     
                     if (printSites){
-                        cout << ", first site: " << firstSite << ", second site: " << secondSite;
+                        std::cout << ", first site: " << firstSite << ", second site: " << secondSite;
                     }
-                    cout << endl;
+                    std::cout << endl;
             }
         
 
@@ -394,18 +410,21 @@ int main()
             //string tempString = to_string(t) + "of" + to_string(temps);
         
 
-            write_out(path + folder  + mode +  "Data.dat",output);
-            write_out(path + folder  + mode +  "BLabels.dat",Blabels);
-            write_out(path + folder  + mode +  "TLabels.dat",Tlabels);
+            write_out(path + folder  + mode +  "Data.dat",outputLattices);
+            write_out(path + folder  + mode +  "Labels.dat",outputLabels);
+            write_out(path + folder  + mode +  "TNumbers.dat",outputTNumbers);
+            write_out(path + folder  + mode +  "Temps.dat",outputTemperatures);
+            write_out(path + "params.dat",outputParams);
+            write_out(path + "paramsDescription.dat",outputParamDescription);
             //write_out(path + folder  + mode +  "Temps.dat",temperatures);
-            //cout << "Written to "<< path + folder + tempString + mode +  "Data.dat" << endl;
-            //cout << "Written to "<< path+folder+mode << endl;
+            //std::cout << "Written to "<< path + folder + tempString + mode +  "Data.dat" << endl;
+            //std::cout << "Written to "<< path+folder+mode << endl;
         }
     
 
     showLattice(lattice);
 
-    cout << "Done!";
+    std::cout << "Done!";
 
     return 0;
 
