@@ -1,3 +1,5 @@
+
+#Setting up
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
@@ -5,6 +7,8 @@ from tensorflow.keras.layers import Flatten, Dense, Dropout
 from tensorflow.keras.callbacks import EarlyStopping
 
 
+
+# Function to look at arrays for troubleshooting
 def showMe(x,nameString,override=False):
     print(nameString)
 
@@ -23,7 +27,6 @@ def load_and_preprocess_data(data_path, labels_path, num_rows, side_length):
 
 
 def shuffle_data(*arrays):
-    # Check if all arrays have the same length
     length = len(arrays[0])
     if not all(len(arr) == length for arr in arrays):
         raise ValueError("All arrays must have the same length")
@@ -33,8 +36,6 @@ def shuffle_data(*arrays):
 
 
 def getModelData(model):
-
-
 
     model_training_labels = np.concatenate((training_labels[:model*size], training_labels[(model+1)*size:]), axis=0)
     model_testing_labels = training_labels[model*size:(model+1)*size]
@@ -62,7 +63,7 @@ def create_model():
     return model
 
 
-# Get params
+# Get parameters of run 
 
 params = np.fromfile('data\\params.dat', dtype=np.float64)
 print(params)
@@ -77,11 +78,6 @@ max_temp = params[5]
 num_rows = temperature_number * sample_number
 
 # Load and preprocess training and validating data
-
-
-print('Got here!')
-
-
 folder_string = 'data\\L=' + str(side_length) + '\\'
 
 training_data = np.fromfile(folder_string+'trainingData.dat', dtype=np.int32).reshape(num_rows, side_length, side_length)
@@ -98,8 +94,9 @@ validating_tnumbers = np.fromfile(folder_string+'validatingTNumbers.dat', dtype=
 
 
 
-# Define the neural network model
+# Define the neural network model, here and in function create_model()
 
+loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
 early_stopping = EarlyStopping(
     monitor='val_loss',
@@ -117,22 +114,25 @@ training_labels = training_labels.flatten()
 
 
 
-# Train the model
-loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
 output_node_number = 2
 
 
-loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-models = [create_model() for _ in range(modelNumber)]
-validating_labels = validating_labels.flatten()
 
-# Start with an empty array with the right shape
+
+
+# Start with an empty array with the right shape, counters for total guesses and correct guesses for each of the models
 temperature_total_guesses = np.zeros((modelNumber,temperature_number))
 temperature_right_guesses = np.zeros((modelNumber,temperature_number))
 
 
+# Create models. I'm still holding each model in memory at once, though it is now all done one-model-at-a-time
+models = [create_model() for _ in range(modelNumber)]
+validating_labels = validating_labels.flatten()
+
 for i, model in enumerate(models):
+
+    # Use getModelData() to define each model's training and validation data
     model_training_labels, model_testing_labels, model_training_data, model_testing_data = getModelData(i)
     model.compile(optimizer='adam', loss=loss_fn, metrics=['accuracy'])
     model.fit(model_training_data, model_training_labels, epochs=50, validation_data=(model_testing_data, model_testing_labels), callbacks=[early_stopping])
@@ -142,6 +142,7 @@ for i, model in enumerate(models):
         for sample in range(sample_number):
             index = t * sample_number + sample
 
+            # tNumber runs from 0 to 49, the number of temperatures chosen, with 0 the coldest and 49 the hottest
             tNumber = validating_tnumbers[index]
 
             correct_label = validating_labels[index]
@@ -160,21 +161,15 @@ for i, model in enumerate(models):
     
 
     
-accuracy = temperature_right_guesses/temperature_total_guesses
-
-print(temperature_right_guesses/temperature_total_guesses)
-    
 
 
 
-
-
-
-
-
+# Define and track values of use to generating figure
 means = np.zeros(temperature_number)
 errors = np.zeros(temperature_number)
 accuracy = temperature_right_guesses/temperature_total_guesses
+
+
 
 
 for t in range(temperature_number):
@@ -185,6 +180,9 @@ for t in range(temperature_number):
     errors[t] = error
 
 
+
+
+
 temperatures = np.linspace(min_temp,max_temp,temperature_number)
 plt.errorbar(temperatures,means,errors)
 
@@ -193,6 +191,6 @@ plt.axvline(x=2/(np.log(1+np.sqrt(2))), color='black', linestyle='dotted')
 
 plt.title("Accuracy of an Ensemble of 5 Neural Networks \n Classifying Configurations of a 10^2 Ising Lattice")
 plt.xlabel("Temperature")
-#plt.ylim(0, 1.2)  # Set y-axis limits from 0 to 12
+plt.ylim(0, 1.2)  # Set y-axis limits from 0 to 1.2
 plt.ylabel("Mean Accuracy of Neural Networks")
 plt.show()
