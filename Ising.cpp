@@ -8,23 +8,26 @@
 
 #include <bits/stdc++.h>
 using namespace std;
+using namespace std::chrono;
 
+auto start = high_resolution_clock::now();
 
 const int N = 10;
-const int counterMax = 1000;
+const int counterMax = 10*N*N;
 const float J = 1;
 const int dimension = 2;
 const int totalSpins = pow(N,dimension);
 const double criticalTemperature = 2/(log(1+sqrt(2)));
 
-const int temps = 50;
-const int samplesPerTemp = 50;
+const int temps = 100;
+const int samplesPerTemp = 100;
+
 const int rows = temps*samplesPerTemp;
 
-const double lowTempCutoff = 1.5;
-const double highTempCutoff = 3;
+const double lowTempCutoff = 1;
+const double highTempCutoff = 1.5;
 
-const bool writeOut= true;
+const bool writeOut= false;
 const bool printSites = false;
 const bool printMeans = true;
 
@@ -33,7 +36,7 @@ const bool printMeans = true;
 const string path = "C:\\Users\\jjhadley\\Documents\\Projects\\Ising\\Data\\";
 const string folder = "L=" + to_string(N) + "\\";
 //const string T_Equals = "T=";
-const string mode = "training";
+const string mode = "validating";
 mt19937 initializeRandomGenerator() {
     unsigned seed = static_cast<unsigned>(time(nullptr));
     mt19937 rng(seed);
@@ -98,6 +101,41 @@ void initializeLattice(vector<int> &lattice, mt19937 &rng) {
         lattice[i] = spin;
     }
 }
+
+
+void getNeighbours(int *neighbours, int size, int site) {
+
+    int neighbSite;
+
+    for (int i = 0;i < size; i++) {
+        int d = ceil(0.5*(i+1));
+
+        neighbSite = int(pow(N, d)) * (site / int(pow(N, d))) + (site + int(pow(-1, i)) * int(pow(N, d - 1)) + int(pow(N, dimension))) % int(pow(N, d));
+
+        neighbours[i] = neighbSite;
+    }
+    
+}
+
+
+
+void getNeighbours(vector<int> &neighbours, int site) {
+
+    int posSite, negSite;
+
+    for (int d = 1;d <= dimension; d++) {
+        
+        posSite = int(pow(N,d)) * (site / int(pow(N,d)) ) + (site + int(pow(N,d-1)) + int(pow(N,dimension)) ) % ( int(pow(N,d)) );
+        negSite = int(pow(N,d)) * (site / int(pow(N,d)) ) + (site - int(pow(N,d-1)) + int(pow(N,dimension)) ) % ( int(pow(N,d)) );      
+        
+        neighbours.push_back(posSite);
+        neighbours.push_back(negSite);
+        
+    }
+    
+}
+
+
 vector<int> getNeighbours(int site) {
     vector<int> neighbours ={};
 
@@ -153,7 +191,11 @@ void showLattice(vector<int> &lattice, bool showValues = false ) {
     for (int site = 0; site < totalSpins; site++) {
         
         magnetisation = magnetisation + getElement(lattice,site);
-        vector<int> siteNeighbours = getNeighbours(site);
+
+        vector<int> siteNeighbours(2*dimension);
+        getNeighbours(siteNeighbours, site);
+        //vector<int> siteNeighbours = getNeighbours(site);
+
 
         if (lattice[site] == 1){
             plusCount++;
@@ -164,7 +206,7 @@ void showLattice(vector<int> &lattice, bool showValues = false ) {
 
 
 
-        for (int dir = 0; dir < siteNeighbours.size(); dir++) {
+        for (int dir = 0; dir < 2*dimension; dir++) {
             if (lattice[site]*lattice[siteNeighbours[dir]] ==1) {
                 agrees++;
             } 
@@ -209,10 +251,13 @@ vector<int> buildCluster(vector<int> &lattice, int startSite, float temperature,
             for (int i=0;i<stackOld.size();i++) {
                 
                 // Get the neighbours
-                vector<int> neighbs = getNeighbours(stackOld[i]);
-                
+
+                vector<int> neighbs(2*dimension);
+                getNeighbours(neighbs, stackOld[i]);
+
+
                 //For each neighbour
-                for (int j=0;j<neighbs.size();j++) {
+                for (int j=0;j<2*dimension;j++) {
                     
                     //if it isn't in the cluster
                     if ( find(cluster.begin(), cluster.end(), neighbs[j]) != cluster.end() ) {
@@ -424,9 +469,14 @@ int main()
 
     showLattice(lattice);
 
-    std::cout << "Done!";
+    std::cout << "Done!"<< endl;
+    auto stop = high_resolution_clock::now();
+    auto duration = duration_cast<microseconds>(stop - start);
+    cout << duration.count() / 1e6 << " seconds" << endl;
+
 
     return 0;
+
 
 
 }
