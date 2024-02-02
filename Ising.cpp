@@ -14,19 +14,19 @@ using namespace std::chrono;
 auto start = high_resolution_clock::now();
 
 const int N = 20;
-const int counterMax = 10*N*N;
 const float J = 1;
 const int dimension = 2;
 const int totalSpins = pow(N,dimension);
+const int counterMax = 10*totalSpins;
 const double criticalTemperature = 2/(log(1+sqrt(2)));
 
-const int temps = 10;
-const int samplesPerTemp = 10;
+const int temps = 100;
+const int samplesPerTemp = 100;
 
 const int rows = temps*samplesPerTemp;
 
-const double lowTempCutoff = 1;
-const double highTempCutoff = 5;
+const double lowTempCutoff = 2.5;
+const double highTempCutoff = 2.5;
 
 const bool writeOut= true;
 const bool printSites = false;
@@ -67,47 +67,19 @@ void linspace(vector<double> &interpVector, double startValue, double endValue, 
     }
 }
 
-/*
-vector<double> getTemperatures(double lowTempCutoff,double highTempCutoff){
-
-    vector<double> temperatures(temps);
-    linspace(temperatures, lowTempCutoff, highTempCutoff,temps);
-    
-    vector<double> returnMatrix(rows);
-    
-    for (int t = 0; t < temps; t++){
-        
-        for (int s = 0; s < samplesPerTemp; s++){
-            returnMatrix[t*samplesPerTemp + s] = temperatures[t];
-        }
-    }
-    return returnMatrix;
-}
-*/
 
 
 
-
-int getElement(vector<int> matrix, int address) {
-    return matrix[address];
-}
 
 int getElement(int *matrix, int address) {
     return matrix[address];
 }
 
 
-void setElement(vector<int> &matrix, int address, int val) {
+void setElement(int *matrix, int address, int val) {
     matrix[address] = val;
 }
-void initializeLattice(vector<int> &lattice, mt19937 &rng) {
-    uniform_int_distribution<int> coin(0, 1);
 
-    for (int i = 0; i < lattice.size(); i++) {
-        int spin = (coin(rng) == 0) ? -1 : 1;
-        lattice[i] = spin;
-    }
-}
 
 
 void initializeLattice(int *lattice, mt19937 &rng) {
@@ -121,8 +93,9 @@ void initializeLattice(int *lattice, mt19937 &rng) {
     }
 }
 
+void getNeighbours(int *neighbours, int site) {
 
-void getNeighbours(int *neighbours, int size, int site) {
+    int size = 2*dimension;
 
     int neighbSite;
 
@@ -135,22 +108,6 @@ void getNeighbours(int *neighbours, int size, int site) {
     }
     
 }
-
-
-void getNeighbours(vector<int> &neighbours, int size, int site) {
-
-    //int size = neighbours.size();
-    int neighbSite;
-
-    for (int i = 0;i < size; i++) {
-        int d = ceil(0.5*(i+1));
-
-        neighbSite = int(pow(N, d)) * (site / int(pow(N, d))) + (site + int(pow(-1, i)) * int(pow(N, d - 1)) + int(pow(N, dimension))) % int(pow(N, d));
-
-        neighbours[i] = neighbSite;
-    } 
-}
-
 
 void showLattice(int *lattice, bool showValues = false ) {
     
@@ -194,7 +151,7 @@ void showLattice(int *lattice, bool showValues = false ) {
 
 
         int siteNeighbours[2*dimension];
-        getNeighbours(siteNeighbours,2*dimension, site);
+        getNeighbours(siteNeighbours, site);
 
 
         if (lattice[site] == 1){
@@ -227,24 +184,9 @@ void showLattice(int *lattice, bool showValues = false ) {
     std::cout << "Magnetisation: " << magnetisation << " " <<"Mean Magnetisation: " << magnetisation / (totalSpins) <<"\n";
     
 }
-void flipSpins(vector<int> &lattice, int site) {
-        lattice[site] = -1*lattice[site];
-}
 
 void flipSpins(int *lattice, int site) {
         lattice[site] = -1*lattice[site];
-}
-void flipSpins(vector<int> &lattice, vector<int> sites) {
-    for (int i = 0; i < sites.size(); i++) {
-        lattice[sites[i]] = -1*lattice[sites[i]];  // flip the spin
-    }
-}
-
-void flipSpins(int *lattice, vector<int> sites) {
-
-    for (int i = 0; i < sites.size(); i++) {
-        lattice[sites[i]] = -1*lattice[sites[i]];  // flip the spin
-    }
 }
 
 void flipSpins(int *lattice, int *sites, int siteNumber) {
@@ -254,150 +196,6 @@ void flipSpins(int *lattice, int *sites, int siteNumber) {
     }
 }
 
-vector<int> buildCluster(vector<int> &lattice, int startSite, float temperature, mt19937&rng ) {
-
-    int startState = getElement(lattice,startSite);
-
-    vector<int> cluster = {startSite};
-    vector<int> stackOld = {startSite};
-
-
-
-    while (not stackOld.empty()) {
-            vector<int> stackNew = {};
-            
-            // For all members of stack Old
-            for (int i=0;i<stackOld.size();i++) {
-                
-                // Get the neighbours
-                int neighbs[2*dimension];
-                getNeighbours(neighbs,2*dimension, stackOld[i]);
-
-
-                //For each neighbour
-                for (int j=0;j<2*dimension;j++) {
-                    
-                    //if it isn't in the cluster
-                    if ( find(cluster.begin(), cluster.end(), neighbs[j]) != cluster.end() ) {
-                    }
-                    else {
-                        // If same state as start
-                        if (getElement(lattice, neighbs[j]) == startState) {
-                            uniform_real_distribution<double> distribution(0.0, 1.0);
-                            if  (distribution(rng) < (1 - exp(-2 * J / temperature))){
-                                stackNew.push_back(neighbs[j]);
-                                cluster.push_back(neighbs[j]);
-                            }
-                        }
-                    }
-                }
-                stackOld = stackNew;
-            }
-
-        }
-    return cluster;
-}
-
-
-void buildCluster(int *lattice,vector<int> &cluster, int startSite, float temperature, mt19937&rng ) {
-
-    int startState = getElement(lattice,startSite);
-
-    
-    vector<int> stackOld = {startSite};
-
-
-
-    while (not stackOld.empty()) {
-            vector<int> stackNew = {};
-            
-            // For all members of stack Old
-            for (int i=0;i<stackOld.size();i++) {
-                
-                // Get the neighbours
-                int neighbs[2*dimension];
-                getNeighbours(neighbs,2*dimension, stackOld[i]);
-
-
-                //For each neighbour
-                for (int j=0;j<2*dimension;j++) {
-                    
-                    //if it isn't in the cluster
-                    if ( find(cluster.begin(), cluster.end(), neighbs[j]) != cluster.end() ) {
-                    }
-                    else {
-                        // If same state as start
-                        if (getElement(lattice, neighbs[j]) == startState) {
-                            uniform_real_distribution<double> distribution(0.0, 1.0);
-                            if  (distribution(rng) < (1 - exp(-2 * J / temperature))){
-                                stackNew.push_back(neighbs[j]);
-                                cluster.push_back(neighbs[j]);
-                            }
-                        }
-                    }
-                }
-                stackOld = stackNew;
-            }
-
-        }
-}
-
-void buildCluster(int *lattice, int *cluster, int *finalClusterSize, float temperature, mt19937&rng ) {
-    int clusterSize = 1;
-
-
-    // Take start site and state from 
-    int startSite = cluster[0];
-    int startState = getElement(lattice, startSite);
-
-    int stackOld[totalSpins] = {0};
-    stackOld[0] = startSite;
-    int stackOldSize = 1;
-
-    int stackNew[totalSpins] = {0};
-    int stackNewSize = 0;
-
-    // Initialise rng
-    static std::uniform_real_distribution<double> distribution(0.0, 1.0);
-
-    while (stackOldSize != 1) {
-        int stackNew[totalSpins] = {};
-
-        // For all members of stack Old
-        for (int i = 0; i < stackOldSize; i++) {
-            // Get the neighbours
-            int neighbs[2 * dimension];
-            getNeighbours(neighbs, 2 * dimension, stackOld[i]);
-
-            // For each neighbour, which in a square lattice is 2*dimension 
-            for (int j = 0; j < 2 * dimension; j++) {
-                
-                // if it isn't in the cluster
-                bool notFound = std::find(cluster, cluster + clusterSize, neighbs[j]) != cluster + clusterSize;
-
-                if (notFound) {
-                } else {
-                    // If same state as start
-                    if (getElement(lattice, neighbs[j]) == startState) {
-
-                        // Roll a number, check against condition
-                        if (distribution(rng) < (1 - exp(-2 * J / temperature))) {
-                            stackNew[stackNewSize] = neighbs[j];
-                            stackNewSize++;
-
-                            cluster[clusterSize] = neighbs[j];
-                            clusterSize++;
-                        }
-                    }
-                }
-            }
-        }
-        std::copy(stackNew, stackNew + stackNewSize, stackOld);
-        stackOldSize = stackNewSize;
-    }
-    *finalClusterSize = clusterSize;
-
-}
 
 
 template <typename T>
@@ -433,13 +231,99 @@ void write_out(const string& fileName, const vector<vector<T>>& vect) {
     outFile.close();
 }
 
+void wolffUpdate(int *lattice, float temperature, mt19937&rng){
+    
+    static uniform_int_distribution<int> distrib(0, totalSpins-1);
+    static std::uniform_real_distribution<double> distribution(0.0, 1.0);
+
+
+    int startSite = distrib(rng);
+    int startState = getElement(lattice, startSite);
+
+
+    int cluster[totalSpins] = {0};
+    cluster[0] = startSite;
+
+    int clusterSize = 1;
+
+
+
+    int stackOld[totalSpins] = {0};
+    stackOld[0] = startSite;
+    int stackOldSize = 1;
+
+    int stackNew[totalSpins] = {0};
+    int stackNewSize = 0;
+
+    int counter2 = 1;
+
+    while (stackOldSize != 0) {
+
+
+
+        stackNewSize = 0;
+
+        // For all members of stack Old
+        for (int i = 0; i < stackOldSize; i++) {
+
+            
+
+            // Get the neighbours
+            int neighbs[2 * dimension];
+            getNeighbours(neighbs, stackOld[i]);
+
+            // For each neighbour, which in a square lattice is 2*dimension 
+            for (int j = 0; j < 2 * dimension; j++) {
+                
+                // if it isn't in the cluster
+                bool notFound = std::find(cluster, cluster + clusterSize, neighbs[j]) != cluster + clusterSize;
+
+                if (notFound) {
+                } else {
+                    // If same state as start
+                    if (getElement(lattice, neighbs[j]) == startState) {
+
+                        // Roll a number, check against condition
+                        if (distribution(rng) < (1 - exp(-2 * J / temperature))) {
+                            stackNew[stackNewSize] = neighbs[j];
+                            stackNewSize++;
+
+                            cluster[clusterSize] = neighbs[j];
+                            clusterSize++;
+                        }
+                    }
+                }
+            }
+        }
+        std::copy(stackNew, stackNew + stackNewSize, stackOld);
+        stackOldSize = stackNewSize;
+    }
+
+
+    flipSpins(lattice, cluster, clusterSize);
+
+}
+
+
+
+
+
 
 int main()
 {
     mt19937 rng = initializeRandomGenerator();
     //vector<double> temperatures = getTemperatures(lowTempCutoff, highTempCutoff);
     vector<double> temperatures(temps);
-    linspace(temperatures,lowTempCutoff,highTempCutoff,temps);
+
+    if (lowTempCutoff==highTempCutoff){
+        for(int i = 0; i<temps;i++){
+            temperatures[i] = lowTempCutoff;
+        }
+    }
+    else{
+        linspace(temperatures,lowTempCutoff,highTempCutoff,temps);
+    }
+    
     
 
     int lattice[totalSpins];
@@ -477,17 +361,9 @@ int main()
         for (int s = 0; s < samplesPerTemp; s++){
             
             row = t*samplesPerTemp + s;
-
-            uniform_int_distribution<int> distrib(0, totalSpins-1);
             temperature = temperatures[t];
-
-
-
-
-
-
-
             initializeLattice(lattice,rng);
+
             initialSum = 0;
             finalSum = 0;
 
@@ -496,34 +372,8 @@ int main()
             }
 
             
-
-
-            startSite = distrib(rng);
-            firstSite = startSite;
-            
-
-            
             for (int counter = 0; counter < counterMax; counter++) {
-                startSite = distrib(rng);
-                if (counter == 1){
-                    secondSite = startSite;
-                }
-
-                //maxClusterSize = totalSpins;
-                int cluster[totalSpins] = {0};
-                cluster[0] = startSite;
-                int clusterSize = 1;
-
-
-                buildCluster(lattice,cluster, &clusterSize, temperature, rng);
-
-                //vector<int> cluster = buildCluster(lattice, startSite, temperature, rng);
-                
-
-
-
-
-                flipSpins(lattice, cluster, clusterSize);
+                wolffUpdate(lattice,temperature,rng);
             }
 
 
